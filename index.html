@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RB Futebol Clube - Scout App</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#b45309">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* ... Estilos do App (mantidos os anteriores) ... */
+        .history-card { background: #222; border-left: 4px solid #fff; padding: 10px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .player-expulso { opacity: 0.4; pointer-events: none; background-color: #300 !important; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: #1e1e1e; padding: 20px; border-radius: 12px; width: 85%; max-height: 80%; overflow-y: auto; border: 1px solid #333; }
+        .btn-gold { background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%); color: black; text-transform: uppercase; font-weight:bold; }
+        .rank-table th, .rank-table td { padding: 8px 2px; font-size: 11px; text-align: center; }
+        .rank-table td:first-child, .rank-table th:first-child { text-align: left; padding-left: 5px; }
+        .backup-area { background: #333; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px dashed #666; }
+        .backup-box { width: 100%; height: 80px; background: #111; color: #0f0; font-family: monospace; font-size: 10px; border: none; padding: 10px; margin: 10px 0; }
+
+        /* --- TELA DE BLOQUEIO (AUTH) --- */
+        #auth-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #121212; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
+        }
+        .auth-input { padding: 15px; font-size: 18px; text-align: center; background: #222; border: 1px solid #444; color: white; border-radius: 8px; margin-bottom: 15px; width: 100%; max-width: 250px; }
+        .shake { animation: shake 0.5s; }
+        @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
+
+        /* --- TELA DE SPLASH (ANIMAÇÃO) --- */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #121212; z-index: 9998; /* Fica abaixo do auth, mas acima do app */
+            display: none; /* Começa escondida */
+            flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 0.5s ease-out; /* Efeito de desaparecimento */
+        }
+        #splash-logo {
+            width: 150px; height: 150px;
+            animation: pulse 2s infinite; /* Animação de pulsar */
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <div style="font-size: 40px; margin-bottom: 20px;">🔒</div>
+        <h2 style="color: white; margin-bottom: 10px;">Acesso Restrito</h2>
+        <p style="color: #888; font-size: 12px; margin-bottom: 20px;">Digite a senha da equipe para liberar.</p>
+        <input type="password" id="authPass" class="auth-input" placeholder="Senha">
+        <button onclick="verificarSenha()" class="btn btn-green" style="width: 100%; max-width: 250px;">LIBERAR ACESSO</button>
+        <p id="authMsg" style="color: #ef4444; margin-top: 15px; display: none;">Senha incorreta!</p>
+    </div>
+
+    <div id="splash-screen">
+        <img id="splash-logo" src="icon.png" alt="RB Scout Logo">
+        <p style="color: #b45309; margin-top: 20px; font-weight: bold;">Carregando...</p>
+    </div>
+
+    <header>
+        <div>RB Futebol Clube - Scout App <span id="anoAtualDisplay" style="font-size:12px; color:#f59e0b">---</span></div>
+        <div style="font-size:10px; color:#aaa">ScoutApp v3.0</div>
+    </header>
+
+    <main>
+        <section id="importar" class="active">
+            <h3>📋 Nova Partida</h3>
+            <textarea id="inputLista" placeholder="Cole a lista do WhatsApp aqui...&#10;Data: 20/05/2026&#10;1. Jogador A..."></textarea>
+            <button onclick="processarLista()" class="btn btn-blue btn-full">PROCESSAR LISTA</button>
+            <div style="margin-top:20px; font-size:12px; color:#777">*Detecta ANO automaticamente.</div>
+        </section>
+        <section id="presenca">
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button onclick="iniciarJogo()" class="btn btn-green" style="flex:2">▶ INICIAR JOGO</button>
+            </div>
+            <button onclick="copiarParaEnquete()" class="btn" style="background:#333; width:100%; margin-bottom:15px; border:1px solid #555; font-size:11px;">📋 COPIAR LISTA (ZAP)</button>
+            <div id="listaPresenca"></div>
+        </section>
+
+        <section id="jogo">
+            <div class="placar-box"><span style="color:var(--azul)" id="placarAzul">0</span> x <span style="color:var(--vermelho)" id="placarVermelho">0</span></div>
+            <div id="listaJogo"></div>
+            <h4 style="margin-top:20px; border-bottom:1px solid #333">Log da Partida</h4>
+            <div id="logVisual" class="log-box"></div>
+            <button onclick="encerrarPartida()" class="btn btn-full" style="background:#222; margin-top:30px; border:1px solid #555">ENCERRAR PARTIDA</button>
+        </section>
+
+        <section id="rankings">
+            <div class="sub-nav">
+                <button onclick="tabRank('overall')" class="active">🏆 Geral</button>
+                <button onclick="tabRank('artilharia')">⚽ Gols</button>
+                <button onclick="tabRank('assist')">👟 Ass</button>
+                <button onclick="tabRank('craque')">👑 Craque</button>
+            </div>
+            <div id="areaBtnCraque" style="display:none; margin-top:15px;"><button onclick="abrirModalCraque()" class="btn btn-gold btn-full">➕ REGISTRAR VENCEDOR DA RODADA</button></div>
+            <div id="rank-content" style="margin-top:15px;"></div>
+            <button onclick="exportarWhatsApp()" class="btn btn-green btn-full" style="margin-top:20px;">📤 EXPORTAR EXCEL</button>
+        </section>
+
+        <section id="config">
+            <h3>⚙️ Segurança de Dados</h3>
+            <p style="font-size:12px; color:#aaa">Seus dados estão salvos apenas neste celular. Faça backup regularmente!</p>
+            
+            <div class="backup-area">
+                <h4>📤 1. Fazer Backup (Salvar)</h4>
+                <button onclick="gerarBackup()" class="btn btn-blue btn-full">GERAR CÓDIGO DE BACKUP</button>
+                <textarea id="boxBackupOut" class="backup-box" readonly placeholder="O código aparecerá aqui..."></textarea>
+                <button onclick="copiarBackup()" class="btn" style="background:#444; font-size:11px;">Copiar Código</button>
+            </div>
+
+            <div class="backup-area" style="border-color:#ef4444">
+                <h4>📥 2. Restaurar (Recuperar)</h4>
+                <textarea id="boxBackupIn" class="backup-box" placeholder="Cole o código de backup aqui..."></textarea>
+                <button onclick="restaurarBackup()" class="btn btn-full" style="background:#ef4444">RESTAURAR DADOS</button>
+            </div>
+
+            <div style="margin-top:30px;">
+                <h3>📅 Histórico de Jogos</h3>
+                <div id="listaHistorico"></div>
+                <button onclick="limparHistorico()" class="btn" style="background:#333; font-size:10px; margin-top:20px;">🗑 Limpar Histórico</button>
+            </div>
+        </section>
+    </main>
+
+    <button id="btnUndo" class="fab-undo" onclick="desfazer()">↩</button>
+
+    <div id="modalCraque" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top:0">Quem venceu a enquete?</h3>
+            <input type="text" id="buscaCraque" placeholder="Filtrar nome..." onkeyup="filtrarListaCraque()" style="width:100%; padding:10px; background:#333; border:none; color:white; margin-bottom:10px; border-radius:6px;">
+            <div id="listaSelecaoCraque"></div>
+            <button onclick="fecharModalCraque()" class="btn" style="width:100%; background:#444; margin-top:15px;">Cancelar</button>
+        </div>
+    </div>
+
+    <nav>
+        <button onclick="nav('importar')" id="nav-importar" class="active">📥 Importar</button>
+        <button onclick="nav('presenca')" id="nav-presenca">📋 Presença</button>
+        <button onclick="nav('jogo')" id="nav-jogo">⚽ Jogo</button>
+        <button onclick="nav('rankings')" id="nav-rankings">📊 Rankings</button>
+        <button onclick="nav('config')" id="nav-config">⚙️ Config</button>
+    </nav>
+
+    <script>
+        // ==========================================
+        // LÓGICA DE SEGURANÇA E ANIMAÇÃO
+        // ==========================================
+        const SENHA_EQUIPE = "RB2026"; // <--- SUA SENHA
+
+        function checarLoginSalvo() {
+            const token = localStorage.getItem('rb_acesso_liberado');
+            if (token === 'sim') {
+                // Se já tem login, esconde a tela de senha direto
+                document.getElementById('auth-screen').style.display = 'none';
+            } else {
+                // Se não tem login, garante que o splash screen esteja escondido
+                document.getElementById('splash-screen').style.display = 'none';
+            }
+        }
+
+        function verificarSenha() {
+            const input = document.getElementById('authPass');
+            const msg = document.getElementById('authMsg');
+            const authScreen = document.getElementById('auth-screen');
+            const splashScreen = document.getElementById('splash-screen');
+            
+            if (input.value === SENHA_EQUIPE) {
+                // 1. Salva o login
+                localStorage.setItem('rb_acesso_liberado', 'sim');
+                
+                // 2. Esconde a tela de senha
+                authScreen.style.display = 'none';
+                
+                // 3. Mostra a tela de splash (com a animação)
+                splashScreen.style.display = 'flex';
+                
+                // 4. Espera 2.5 segundos e então esconde o splash e mostra o app
+                setTimeout(() => {
+                    splashScreen.style.opacity = '0'; // Começa o fade-out
+                    setTimeout(() => {
+                        splashScreen.style.display = 'none'; // Remove da tela após o fade
+                    }, 500); // Tempo do CSS transition
+                }, 2500); // Tempo da animação na tela
+
+            } else {
+                // Senha errada
+                msg.style.display = 'block';
+                input.classList.add('shake');
+                input.value = '';
+                setTimeout(() => input.classList.remove('shake'), 500);
+            }
+        }
+
+        document.getElementById('authPass').addEventListener("keypress", function(event) {
+            if (event.key === "Enter") verificarSenha();
+        });
+
+
+        // ==========================================
+        // CÓDIGO ORIGINAL DO APP (Mantido igual)
+        // ==========================================
+        let APP = { anoAtivo: '2026', dataJogoAtual: new Date().toLocaleDateString() };
+        let DB = {}; 
+        let Jogo = { ativo: false, placar: { azul: 0, vermelho: 0 }, acoes: [], log: [], listaJogadores: [] };
+
+        window.onload = function() { 
+            checarLoginSalvo(); // Verifica a senha/login
+            carregarTudo(); 
+            nav('importar'); 
+        };
+        
+        // ... (O RESTANTE DO SCRIPT ORIGINAL PERMANECE IDÊNTICO) ...
+        function carregarTudo() { const s = localStorage.getItem('FutebolRB_FULL_DB'); if (s) DB = JSON.parse(s); atualizarHeader(); }
+        function salvarTudo() { localStorage.setItem('FutebolRB_FULL_DB', JSON.stringify(DB)); atualizarHeader(); }
+        function atualizarHeader() { document.getElementById('anoAtualDisplay').innerText = APP.anoAtivo; }
+        function getDBAtual() { if (!DB[APP.anoAtivo]) DB[APP.anoAtivo] = { jogadores: [], historico: [] }; return DB[APP.anoAtivo]; }
+        function nav(id) { document.querySelectorAll('section').forEach(e => e.classList.remove('active')); document.querySelectorAll('nav button').forEach(e => e.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('nav-' + id).classList.add('active'); if(id === 'rankings') tabRank('overall'); if(id === 'config') renderHistorico(); }
+        function gerarBackup() { const dados = JSON.stringify(DB); const b64 = btoa(unescape(encodeURIComponent(dados))); document.getElementById('boxBackupOut').value = b64; alert("Código gerado! Copie e guarde em um local seguro (Email/WhatsApp)."); }
+        function copiarBackup() { const txt = document.getElementById('boxBackupOut'); txt.select(); navigator.clipboard.writeText(txt.value); alert("Copiado!"); }
+        function restaurarBackup() { const codigo = document.getElementById('boxBackupIn').value; if(!codigo) return alert("Cole o código primeiro."); if(!confirm("ATENÇÃO: Isso vai apagar os dados atuais e substituir pelo backup. Continuar?")) return; try { const dados = decodeURIComponent(escape(atob(codigo))); DB = JSON.parse(dados); salvarTudo(); alert("Dados restaurados com sucesso!"); nav('rankings'); } catch(e) { alert("Código inválido ou corrompido."); } }
+        function processarLista() { const txt = document.getElementById('inputLista').value; if (!txt) return alert("Cole a lista primeiro!"); const matchData = txt.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (matchData) { APP.anoAtivo = matchData[3]; APP.dataJogoAtual = matchData[0]; alert(`Temporada ${APP.anoAtivo} detectada!`); } else { if(!confirm(`Data não encontrada. Usar ${APP.anoAtivo}?`)) return; } Jogo = { ativo: false, placar: { azul: 0, vermelho: 0 }, acoes: [], log: [], listaJogadores: [] }; const lines = txt.split('\n'); let timeAtual = null; const dbAno = getDBAtual(); lines.forEach(l => { l = l.trim(); if (/AZUL/i.test(l)) timeAtual = 'azul'; else if (/VERMELHO/i.test(l)) timeAtual = 'vermelho'; else if (/^(\d+\.|-)/.test(l) && timeAtual) { const nome = l.replace(/^(\d+\.|-)/, '').trim(); let jogDB = dbAno.jogadores.find(j => j.nome.toLowerCase() === nome.toLowerCase()); if (!jogDB) { jogDB = { id: 'p_'+Date.now()+Math.random(), nome: nome, g:0, a:0, presencas:0, am:0, az:0, vm:0, craque:0, avulso: false }; dbAno.jogadores.push(jogDB); } if(typeof jogDB.craque === 'undefined') jogDB.craque = 0; Jogo.listaJogadores.push({ id: jogDB.id, nome: jogDB.nome, time: timeAtual, presente: true, tempAm:0, tempAz:0, tempVm:0 }); } }); salvarTudo(); document.getElementById('inputLista').value = ""; renderPresenca(); nav('presenca'); }
+        function renderPresenca() { const div = document.getElementById('listaPresenca'); div.innerHTML = ''; const dbAno = getDBAtual(); Jogo.listaJogadores.forEach(item => { const jogDB = dbAno.jogadores.find(j => j.id === item.id); const isAvulso = jogDB ? jogDB.avulso : false; const cor = item.time==='azul'?'var(--azul)':'var(--vermelho)'; div.innerHTML += `<div class="card" style="border-left:5px solid ${cor}; opacity:${item.presente?'1':'0.5'}; display:flex; justify-content:space-between; align-items:center;"><div><strong>${item.nome}</strong><br><span style="font-size:10px;color:#888">${isAvulso?'👤 Avulso':'⭐ Mensalista'}</span></div><div style="display:flex; gap:5px;"><button class="btn-icon" onclick="toggleTipo('${item.id}')">${isAvulso?'👤':'⭐'}</button><button class="btn-icon" style="background:#333" onclick="trocarTime('${item.id}')">🔄</button><button class="btn-icon" style="background:${item.presente?'var(--green)':'#444'}" onclick="togglePresenca('${item.id}')">${item.presente?'✅':'❌'}</button></div></div>`; }); }
+        function copiarParaEnquete() { const elegiveis = Jogo.listaJogadores.filter(i => i.presente && !getDBAtual().jogadores.find(j=>j.id===i.id).avulso); if(elegiveis.length===0) return alert("Nenhum mensalista presente."); let texto = ""; elegiveis.forEach(j => texto += `${j.nome}\n`); navigator.clipboard.writeText(texto).then(() => { alert("Copiado! Cole no WhatsApp."); }).catch(()=>alert("Erro ao copiar.")); }
+        function togglePresenca(id) { const i=Jogo.listaJogadores.find(x=>x.id===id); if(i){i.presente=!i.presente; renderPresenca();} }
+        function trocarTime(id) { const i=Jogo.listaJogadores.find(x=>x.id===id); if(i){i.time=i.time==='azul'?'vermelho':'azul'; renderPresenca();} }
+        function toggleTipo(id) { const j=getDBAtual().jogadores.find(x=>x.id===id); if(j){j.avulso=!j.avulso; salvarTudo(); renderPresenca();} }
+        function iniciarJogo() { const presentes = Jogo.listaJogadores.filter(j => j.presente); if(presentes.length===0) return alert("Ninguém presente!"); getDBAtual().jogadores.forEach(j => { if(presentes.find(p=>p.id===j.id && !j.avulso)) j.presencas++; }); presentes.forEach(p => { p.tempAm=0; p.tempAz=0; p.tempVm=0; }); Jogo.log=[]; Jogo.acoes=[]; Jogo.ativo=true; salvarTudo(); renderJogo(); nav('jogo'); }
+        function renderJogo() { const div = document.getElementById('listaJogo'); div.innerHTML = ''; document.getElementById('placarAzul').innerText = Jogo.placar.azul; document.getElementById('placarVermelho').innerText = Jogo.placar.vermelho; document.getElementById('logVisual').innerHTML = Jogo.log.map(l=>`<div style="font-size:11px;border-bottom:1px solid #222;padding:4px;">${l}</div>`).join(''); document.getElementById('btnUndo').style.display = (Jogo.ativo && Jogo.acoes.length>0)?'flex':'none'; if(!Jogo.ativo) { div.innerHTML='<div style="text-align:center;color:#666;padding:20px;">Encerrado.</div>'; return; } ['azul','vermelho'].forEach(t => { const cor = t==='azul'?'var(--azul)':'var(--vermelho)'; div.innerHTML += `<div style="color:${cor};font-weight:bold;margin:15px 0 5px 0;text-transform:uppercase;border-bottom:1px solid #333">TIME ${t}</div>`; Jogo.listaJogadores.filter(x=>x.time===t && x.presente).forEach(item => { const exp = item.tempVm>0; div.innerHTML += `<div class="card ${exp?'player-expulso':''}" style="padding:8px;"><div style="font-weight:bold;margin-bottom:5px;">${item.nome} ${exp?'<span style="color:red;font-size:10px">(EXP)</span>':''}</div><div style="display:flex; justify-content:space-between; gap:2px;"><button class="game-btn" onclick="acao('${item.id}','g',1)">⚽</button><button class="game-btn" onclick="acao('${item.id}','a',1)">👟</button><button class="game-btn" style="color:var(--gold);opacity:${item.tempAm>0?0.3:1}" onclick="acao('${item.id}','am',1)">🟨</button><button class="game-btn" style="color:var(--azul);opacity:${item.tempAz>0?0.3:1}" onclick="acao('${item.id}','az',1)">🟦</button><button class="game-btn" style="color:var(--vermelho);opacity:${item.tempVm>0?0.3:1}" onclick="acao('${item.id}','vm',1)">🟥</button></div></div>`; }); }); }
+        function acao(id, tipo, val) { if(!Jogo.ativo) return; const item = Jogo.listaJogadores.find(x=>x.id===id); const dbJ = getDBAtual().jogadores.find(x=>x.id===id); if(!item || !dbJ) return; if(item.tempVm>0 || (tipo==='am' && item.tempAm>0) || (tipo==='az' && item.tempAz>0) || (tipo==='vm' && item.tempVm>0)) return alert("Inválido/Limite atingido!"); dbJ[tipo]+=val; if(tipo==='am')item.tempAm++; if(tipo==='az')item.tempAz++; if(tipo==='vm')item.tempVm++; if(tipo==='g') Jogo.placar[item.time]+=val; const tags={g:'⚽ Gol',a:'👟 Ass',am:'🟨 Am',az:'🟦 Az',vm:'🟥 Ver'}; Jogo.log.unshift(`${tags[tipo]}: ${item.nome}`); Jogo.acoes.push({id,tipo,val,time:item.time}); salvarTudo(); renderJogo(); }
+        function desfazer() { if(!Jogo.ativo || Jogo.acoes.length===0) return; const act = Jogo.acoes.pop(); const dbJ = getDBAtual().jogadores.find(x=>x.id===act.id); const item = Jogo.listaJogadores.find(x=>x.id===act.id); if(dbJ) { dbJ[act.tipo]-=act.val; if(dbJ[act.tipo]<0) dbJ[act.tipo]=0; } if(item) { if(act.tipo==='am')item.tempAm--; if(act.tipo==='az')item.tempAz--; if(act.tipo==='vm')item.tempVm--; } if(act.tipo==='g') { Jogo.placar[act.time]-=act.val; if(Jogo.placar[act.time]<0) Jogo.placar[act.time]=0; } Jogo.log.shift(); salvarTudo(); renderJogo(); }
+        function encerrarPartida() { if(!Jogo.ativo) return; if(!confirm("Encerrar?")) return; getDBAtual().historico.unshift({ data: APP.dataJogoAtual, golsAzul: Jogo.placar.azul, golsVermelho: Jogo.placar.vermelho }); Jogo.ativo=false; salvarTudo(); renderJogo(); alert("Salvo!"); nav('config'); }
+        function calcPoints(j) { return ((j.g*4)+(j.a*3)+(j.presencas*2)-((j.am*0.2)+(j.az*0.5)+(j.vm*1.0))).toFixed(1); }
+        function tabRank(tipo) { const div = document.getElementById('rank-content'); document.querySelectorAll('.sub-nav button').forEach(b=>b.classList.remove('active')); document.querySelector(`.sub-nav button[onclick="tabRank('${tipo}')"]`).classList.add('active'); document.getElementById('areaBtnCraque').style.display = (tipo==='craque')?'block':'none'; const lista = getDBAtual().jogadores.filter(j=>!j.avulso); let html = ''; if (tipo === 'overall') { const sorted = lista.sort((a,b)=>calcPoints(b)-calcPoints(a)); html = `<div style="overflow-x:auto;"><table class="rank-table"><tr><th>#</th><th>Nome</th><th>J</th><th>G</th><th>A</th><th>🟨</th><th>🟦</th><th>🟥</th><th>🏆</th><th>Pts</th></tr>${sorted.map((j,i)=>`<tr><td>${i+1}</td><td style="font-weight:bold">${j.nome}</td><td>${j.presencas}</td><td>${j.g}</td><td>${j.a}</td><td>${j.am}</td><td>${j.az}</td><td>${j.vm}</td><td>${j.craque||0}</td><td style="color:var(--gold)">${calcPoints(j)}</td></tr>`).join('')}</table></div>`; } else if (tipo === 'craque') { html = `<table class="rank-table"><tr><th>Nome</th><th>Prêmios</th></tr>${lista.sort((a,b)=>(b.craque||0)-(a.craque||0)).filter(j=>(j.craque||0)>0).map((j,i)=>`<tr><td>${i+1}. ${j.nome}</td><td style="color:var(--gold);font-size:16px">🏆 ${j.craque}</td></tr>`).join('')}</table>`; } else if (tipo === 'artilharia' || tipo === 'assist') { const prop = tipo==='artilharia'?'g':'a'; html = `<table class="rank-table"><tr><th>Nome</th><th>${tipo==='artilharia'?'Gols':'Ass'}</th></tr>${lista.sort((a,b)=>b[prop]-a[prop]).slice(0,20).map((j,i)=>`<tr><td>${i+1}. ${j.nome}</td><td style="color:var(--gold)">${j[prop]}</td></tr>`).join('')}</table>`; } div.innerHTML = html; }
+        function abrirModalCraque() { document.getElementById('listaSelecaoCraque').innerHTML = getDBAtual().jogadores.filter(j=>!j.avulso).sort((a,b)=>a.nome.localeCompare(b.nome)).map(j=>`<button onclick="eleger('${j.id}','${j.nome}')" style="width:100%;padding:12px;margin-bottom:5px;background:#333;border:none;color:white;text-align:left;border-radius:6px;">${j.nome}</button>`).join(''); document.getElementById('modalCraque').style.display='flex'; }
+        function filtrarListaCraque() { const v=document.getElementById('buscaCraque').value.toLowerCase(); for(let b of document.getElementById('listaSelecaoCraque').children) b.style.display=b.innerText.toLowerCase().includes(v)?'block':'none'; }
+        function eleger(id,nome) { if(confirm(`Confirmar ${nome}?`)) { const j=getDBAtual().jogadores.find(x=>x.id===id); if(j){j.craque=(j.craque||0)+1; salvarTudo(); fecharModalCraque(); tabRank('craque');} } }
+        function fecharModalCraque() { document.getElementById('modalCraque').style.display='none'; }
+        function exportarWhatsApp() { let t = `*SCOUT RB ${APP.anoAtivo}*\nNome;J;G;A;Am;Az;Vm;Cr;PTS\n`; getDBAtual().jogadores.filter(j=>!j.avulso).sort((a,b)=>calcPoints(b)-calcPoints(a)).forEach(j=>t+=`${j.nome};${j.presencas};${j.g};${j.a};${j.am};${j.az};${j.vm};${j.craque||0};${calcPoints(j).replace('.',',')}\n`); window.open(`https://wa.me/?text=${encodeURIComponent(t)}`,'_blank'); }
+        function renderHistorico() { const l = getDBAtual().historico || []; document.getElementById('listaHistorico').innerHTML = l.length===0?'<div style="text-align:center;padding:20px;color:#666">Vazio.</div>' : l.map(h => { const gAz = h.golsAzul ?? h.pa ?? '?'; const gVm = h.golsVermelho ?? h.pv ?? '?'; return `<div class="history-card"><div style="font-weight:bold;color:var(--vermelho)">VER ${gVm}</div><div style="color:#666">X</div><div style="font-weight:bold;color:var(--azul)">${gAz} AZU</div><div style="font-size:10px;color:#aaa">${h.data}</div></div>`; }).join(''); }
+        function limparHistorico() { if(confirm("Apagar?")){ getDBAtual().historico=[]; salvarTudo(); renderHistorico(); } }
+    </script>
+</body>
+</html>
