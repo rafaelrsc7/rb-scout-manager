@@ -45,6 +45,9 @@
         #splash-logo {
             width: 150px; height: 150px;
             animation: pulse 2s infinite; /* Animação de pulsar */
+            /* --- CORREÇÃO DAS PONTAS BRANCAS AQUI --- */
+            border-radius: 50%; 
+            overflow: hidden;
         }
         @keyframes pulse {
             0% { transform: scale(1); opacity: 1; }
@@ -250,6 +253,18 @@
         function exportarWhatsApp() { let t = `*SCOUT RB ${APP.anoAtivo}*\nNome;J;G;A;Am;Az;Vm;Cr;PTS\n`; getDBAtual().jogadores.filter(j=>!j.avulso).sort((a,b)=>calcPoints(b)-calcPoints(a)).forEach(j=>t+=`${j.nome};${j.presencas};${j.g};${j.a};${j.am};${j.az};${j.vm};${j.craque||0};${calcPoints(j).replace('.',',')}\n`); window.open(`https://wa.me/?text=${encodeURIComponent(t)}`,'_blank'); }
         function renderHistorico() { const l = getDBAtual().historico || []; document.getElementById('listaHistorico').innerHTML = l.length===0?'<div style="text-align:center;padding:20px;color:#666">Vazio.</div>' : l.map(h => { const gAz = h.golsAzul ?? h.pa ?? '?'; const gVm = h.golsVermelho ?? h.pv ?? '?'; return `<div class="history-card"><div style="font-weight:bold;color:var(--vermelho)">VER ${gVm}</div><div style="color:#666">X</div><div style="font-weight:bold;color:var(--azul)">${gAz} AZU</div><div style="font-size:10px;color:#aaa">${h.data}</div></div>`; }).join(''); }
         function limparHistorico() { if(confirm("Apagar?")){ getDBAtual().historico=[]; salvarTudo(); renderHistorico(); } }
+    </script>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').then(function(registration) {
+            console.log('ServiceWorker registrado com sucesso: ', registration.scope);
+          }, function(err) {
+            console.log('Falha ao registrar o ServiceWorker: ', err);
+          });
+        });
+      }
     </script>
 </body>
 </html>
